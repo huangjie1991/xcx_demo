@@ -10,58 +10,44 @@ import org.springframework.cache.interceptor.KeyGenerator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.RedisSerializationContext;
-import org.springframework.data.redis.serializer.RedisSerializer;
+
+import com.xcx.core.commom.TedisCacheManager;
 
 @EnableCaching
 @Configuration
 public class RedisCacheConfig extends CachingConfigurerSupport {
-	private volatile JedisConnectionFactory jedisConnectionFactory;
-	private volatile RedisTemplate<String, String> redisTemplate;
-	private volatile RedisCacheManager redisCacheManager;
-
 	public RedisCacheConfig() {
 		super();
 	}
 
-	/**
-	 * 带参数的构造方法 初始化所有的成员变量
-	 * 
-	 * @param jedisConnectionFactory
-	 * @param redisTemplate
-	 * @param redisCacheManager
-	 */
-	public RedisCacheConfig(JedisConnectionFactory jedisConnectionFactory, RedisTemplate<String, String> redisTemplate,
-			RedisCacheManager redisCacheManager) {
-		this.jedisConnectionFactory = jedisConnectionFactory;
-		this.redisTemplate = redisTemplate;
-		this.redisCacheManager = redisCacheManager;
-	}
-
-
-	public RedisCacheManager getRedisCacheManager() {
-		return redisCacheManager;
-	}
-	
 	@Bean
 	public CacheManager redisCacheManager(RedisConnectionFactory connectionFactory) {
-		RedisSerializationContext.SerializationPair serializationPair =
-				RedisSerializationContext.SerializationPair.fromSerializer(getRedisSerializer());
-		RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
-				.entryTtl(Duration.ofSeconds(30))
-				.serializeValuesWith(serializationPair);
-		return RedisCacheManager
-				.builder(RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory))
-				.cacheDefaults(redisCacheConfiguration).build();
-	}
+		// 初始化一个RedisCacheWriter
+        RedisCacheWriter cacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(connectionFactory);
 
-  	private RedisSerializer<Object> getRedisSerializer(){
-		return new GenericFastJsonRedisSerializer();
+        // 设置默认过期时间：30 分钟
+        RedisCacheConfiguration defaultCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(30))
+                // .disableCachingNullValues()
+                // 使用注解时的序列化、反序列化
+                .serializeKeysWith(TedisCacheManager.STRING_PAIR)
+                .serializeValuesWith(TedisCacheManager.FASTJSON_PAIR);
+
+        // Map<String, RedisCacheConfiguration> caches = new HashMap<>();
+        // // 缓存配置
+        // RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+        //         .entryTtl(Duration.ofSeconds(60))
+        //         .disableCachingNullValues()
+        //         // .prefixKeysWith("redis.service")
+        //         .serializeKeysWith(stringPair)
+        //         .serializeValuesWith(fastJsonPair);
+        // caches.put("redis.service", config);
+        // return new TedisCacheManager(cacheWriter, defaultCacheConfig, caches);
+
+        return new TedisCacheManager(cacheWriter, defaultCacheConfig);
+        
 	}
 
 	@Bean
